@@ -78,20 +78,39 @@ def find_files_by_extension(root_dir, extensions):
     return file_dict
 
 
-def get_user_confirmation(folder_path, files_to_copy):
-    """获取用户确认是否导入文件"""
-    print(f"\n素材文件夹 {folder_path} 将导入以下RAW文件：")
-    for file_path in files_to_copy:
-        print(file_path)
+def get_user_confirmation(prompt, message=None, details=None, default_confirm=False):
+    """
+    获取用户确认的通用函数
+    """
+    # 打印主要信息
+    if message:
+        print(message)
+
+    # 如果有详细信息，逐条打印
+    if details:
+        for item in details:
+            print(item)
+
+    # 根据默认选择设置提示信息
+    prompt += "[Y/n]" if default_confirm else "[y/N]"
 
     while True:
-        response = input("是否导入？[Y/n] ").strip().lower()
-        if response in ['y', 'yes', '是', '']:
+        response = input(prompt).strip().lower()
+
+        # 处理空输入（使用默认选择）
+        if response == '':
+            return default_confirm
+
+        # 确认选项
+        if response in ['y', 'yes', '是']:
             return True
-        elif response in ['n', 'no', '否']:
+
+        # 拒绝选项
+        if response in ['n', 'no', '否']:
             return False
-        else:
-            print("请重新输入")
+
+        # 无效输入
+        print("输入无效，请重新输入")
 
 
 def process_material_folder(folder_path, folder_files, camera_raw_files, auto_confirm=False):
@@ -155,7 +174,12 @@ def process_material_folder(folder_path, folder_files, camera_raw_files, auto_co
 
     # 如果有文件需要复制，询问用户确认
     if files_to_copy:
-        if auto_confirm or get_user_confirmation(folder_path, files_to_copy):
+        if auto_confirm or get_user_confirmation(
+                '是否导入？',
+                f'\n素材文件夹 {folder_path} 将导入以下RAW文件：',
+                files_to_copy,
+                True
+        ):
             for raw_path in files_to_copy:
                 try:
                     # 复制RAW文件
@@ -182,11 +206,11 @@ def import_raw_photos(material_dir=None, camera_drives=None, auto_confirm=False)
         # 排除素材文件夹所在盘符
         material_drive = os.path.splitdrive(material_dir)[0]
         camera_drives = find_camera_drives(exclude_drives=[material_drive])
-        logger.info(f"找到相机存储: {', '.join(camera_drives)}")
-
-    if not camera_drives:
-        logger.error("未找到相机存储")
-        return 0
+        if camera_drives:
+            logger.info(f"找到相机存储: {', '.join(camera_drives)}")
+        else:
+            logger.error("未找到相机存储")
+            return 0
 
     # 3. 查找所有相机存储中的RAW文件
     camera_raw_files = defaultdict(list)
@@ -195,7 +219,11 @@ def import_raw_photos(material_dir=None, camera_drives=None, auto_confirm=False)
         dcim_path = os.path.join(drive, "DCIM")
         # 具体的目录
         if not os.path.exists(dcim_path) or not os.path.isdir(dcim_path):
-            dcim_path = drive
+            if get_user_confirmation(f"未找到 {dcim_path}，是否使用 {drive} 继续扫描？"):
+                dcim_path = drive
+            else:
+                logger.info(f"跳过目录 {drive}")
+                continue
         logger.info(f"扫描相机存储 {drive} 中的RAW文件...")
 
         drive_raw_files = find_files_by_extension(dcim_path, SUPPORTED_IMAGE_FORMATS['raw'])
@@ -246,11 +274,15 @@ def main():
                 camera_drives.append(source)
 
     # 执行RAW导入
-    import_raw_photos(
-        material_dir=args.destination,
-        camera_drives=camera_drives if args.source else None,
-        auto_confirm=args.yes
-    )
+    while True:
+        import_raw_photos(
+            material_dir=args.destination,
+            camera_drives=camera_drives if args.source else None,
+            auto_confirm=args.yes
+        )
+
+        if args.yes or not get_user_confirmation('是否再次运行？'):
+            break
 
 
 if __name__ == "__main__":
