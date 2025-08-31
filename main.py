@@ -219,7 +219,7 @@ def import_raw_photos(material_dir=None, camera_drives=None, auto_confirm=False)
         dcim_path = os.path.join(drive, "DCIM")
         # 具体的目录
         if not os.path.exists(dcim_path) or not os.path.isdir(dcim_path):
-            if get_user_confirmation(f"未找到 {dcim_path}，是否使用 {drive} 继续扫描？"):
+            if auto_confirm or get_user_confirmation(f"未找到 {dcim_path}，是否使用 {drive} 继续扫描？"):
                 dcim_path = drive
             else:
                 logger.info(f"跳过目录 {drive}")
@@ -258,8 +258,8 @@ def main():
     parser = argparse.ArgumentParser(description='从相机存储中自动导入RAW格式照片')
     parser.add_argument('-s', '--source', nargs='+', help='相机存储路径（盘符或路径）')
     parser.add_argument('-d', '--destination', default=os.getcwd(),
-                        help='素材文件夹路径，默认为当前工作目录')
-    parser.add_argument('-y', '--yes', action='store_true', help='自动确认所有RAW导入')
+                        help='素材文件夹路径（默认为当前目录）')
+    parser.add_argument('-y', '--yes', action='store_true', help='自动确认所有交互操作')
 
     args = parser.parse_args()
 
